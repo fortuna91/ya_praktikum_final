@@ -132,12 +132,13 @@ func UploadOrder(w http.ResponseWriter, r *http.Request) {
 func GetOrders(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 	defer cancel()
-	r.Header.Add("Content-Type", "application/json; charset=utf-8")
+	// r.Header.Add("Content-Type", "application/json; charset=utf-8")
 
 	token, _ := auth.GetTokenFromHeader(r)
 	login, _ := auth.ParseToken(token)
 	user := DB.GetUser(ctx, login)
 	ordersDB := DB.GetOrders(ctx, user.ID)
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	if ordersDB == nil {
 		log.Println("No orders for user")
 		w.WriteHeader(http.StatusNoContent)
@@ -149,7 +150,6 @@ func GetOrders(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Error sending the response", http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	_, errBody := w.Write(bodyResp)
 	if errBody != nil {
