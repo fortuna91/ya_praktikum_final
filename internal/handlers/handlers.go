@@ -23,6 +23,7 @@ const NewStatus = "NEW"
 func Register(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 	defer cancel()
+	r.Header.Add("Content-Type", "application/json; charset=utf-8")
 	respBody := utils.GetBody(r.Body)
 	if respBody == nil {
 		http.Error(w, "Couldn't read body", http.StatusInternalServerError)
@@ -54,13 +55,15 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Error sending the response", http.StatusInternalServerError)
 		return
 	}
-	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Authorization", "Bearer "+signedToken)
+	w.WriteHeader(http.StatusOK)
 }
 
 func Login(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 	defer cancel()
+	r.Header.Add("Content-Type", "application/json; charset=utf-8")
+	
 	respBody := utils.GetBody(r.Body)
 	if respBody == nil {
 		http.Error(w, "Couldn't read body", http.StatusInternalServerError)
@@ -87,8 +90,8 @@ func Login(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Error sending the response", http.StatusInternalServerError)
 		return
 	}
-	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Authorization", "Bearer "+signedToken)
+	w.WriteHeader(http.StatusOK)
 }
 
 func UploadOrder(w http.ResponseWriter, r *http.Request) {
