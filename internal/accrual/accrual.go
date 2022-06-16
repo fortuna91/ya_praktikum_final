@@ -39,7 +39,7 @@ func sendRequest(client *http.Client, request *http.Request) *http.Response {
 
 func getAccrual(accrualSystemAddress string, orderID string) (*db.OrderData, int) {
 	client := http.Client{}
-	request, _ := http.NewRequest(http.MethodGet, "http://"+accrualSystemAddress+"/api/orders/"+orderID, nil)
+	request, _ := http.NewRequest(http.MethodGet, accrualSystemAddress+"/api/orders/"+orderID, nil)
 	response := sendRequest(&client, request)
 	if response == nil {
 		log.Println("Error in getting accrual")
