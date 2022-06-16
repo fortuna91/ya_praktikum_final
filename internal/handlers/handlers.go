@@ -162,7 +162,6 @@ func GetOrders(w http.ResponseWriter, r *http.Request) {
 func GetBalance(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 	defer cancel()
-	r.Header.Add("Content-Type", "application/json; charset=utf-8")
 
 	token, _ := auth.GetTokenFromHeader(r)
 	login, _ := auth.ParseToken(token)
@@ -173,9 +172,7 @@ func GetBalance(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	bodyResp, err := json.Marshal(*balanceDB)
-	fmt.Printf("balance body %v\n", *balanceDB)
-	fmt.Printf("balance body %v\n", balanceDB)
+	bodyResp, err := json.Marshal(balanceDB)
 	if err != nil {
 		log.Printf("Cannot convert Balance to JSON: %v", err)
 		http.Error(w, "Error sending the response", http.StatusInternalServerError)
