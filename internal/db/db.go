@@ -23,7 +23,7 @@ type OrderData struct {
 	ID         string    `json:"number,omitempty"`
 	UserID     int64     `json:"-"`
 	Status     string    `json:"status"`
-	Accrual    float64   `json:"accrual,omitempty"`
+	Accrual    float32   `json:"accrual,omitempty"`
 	UploadedAt time.Time `json:"uploaded_at"`
 	// for accrual system
 	// OrderID string `json:"order,omitempty"`
@@ -31,13 +31,13 @@ type OrderData struct {
 
 type BalanceData struct {
 	UserID    int64   `json:"-"`
-	Current   float64 `json:"current"`
-	Withdrawn float64 `json:"withdrawn"`
+	Current   float32 `json:"current"`
+	Withdrawn float32 `json:"withdrawn"`
 }
 
 type WithdrawalsData struct {
 	UserID      int64     `json:"-"`
-	Sum         float64   `json:"sum"`
+	Sum         float32   `json:"sum"`
 	ProcessedAt time.Time `json:"processed_at"`
 	OrderID     string    `json:"order"`
 }
@@ -102,7 +102,7 @@ func (db *DBStorage) GetOrder(ctx context.Context, orderID string) *OrderData {
 		order.Status = status.String
 	}
 	if accrual.Valid {
-		order.Accrual = accrual.Float64
+		order.Accrual = float32(accrual.Float64)
 	}
 	return &order
 }
@@ -117,7 +117,7 @@ func (db *DBStorage) AddOrder(ctx context.Context, id string, userID int64, stat
 	return nil
 }
 
-func (db *DBStorage) UpdateOrder(ctx context.Context, id string, userID int64, status string, accrual float64) error {
+func (db *DBStorage) UpdateOrder(ctx context.Context, id string, userID int64, status string, accrual float32) error {
 	_, err := db.dbConnection.ExecContext(ctx, "INSERT INTO Orders (id, user_id, status, accrual) VALUES ($1, $2, $3, $4)"+
 		"ON CONFLICT (id) DO UPDATE SET status = excluded.status, accrual = excluded.accrual;",
 		id, userID, status, accrual)
@@ -150,7 +150,7 @@ func (db *DBStorage) GetOrders(ctx context.Context, userID int64) []OrderData {
 			order.Status = status.String
 		}
 		if accrual.Valid {
-			order.Accrual = accrual.Float64
+			order.Accrual = float32(accrual.Float64)
 		}
 		orders = append(orders, order)
 	}
@@ -161,8 +161,9 @@ func (db *DBStorage) GetOrders(ctx context.Context, userID int64) []OrderData {
 	return orders
 }
 
-func (db *DBStorage) UpdateBalance(ctx context.Context, userID int64, current float64, withdrawn float64) error {
-	current = math.Round(current)
+func (db *DBStorage) UpdateBalance(ctx context.Context, userID int64, current float32, withdrawn float32) error {
+	current = float32(math.Round(float64(current*100)) / 100)
+	withdrawn = float32(math.Round(float64(withdrawn*100)) / 100)
 	_, err := db.dbConnection.ExecContext(ctx, "INSERT INTO Balances (user_id, current, withdrawn) VALUES ($1, $2, $3) ON CONFLICT (user_id) DO UPDATE SET current = excluded.current, withdrawn = excluded.withdrawn",
 		userID, current, withdrawn)
 	if err != nil {
@@ -184,7 +185,8 @@ func (db *DBStorage) GetBalance(ctx context.Context, userID int64) *BalanceData 
 	return &balance
 }
 
-func (db *DBStorage) AddWithdrawal(ctx context.Context, userID int64, sum float64, orderID string) error {
+func (db *DBStorage) AddWithdrawal(ctx context.Context, userID int64, sum float32, orderID string) error {
+	sum = float32(math.Round(float64(sum*100)) / 100)
 	_, err := db.dbConnection.ExecContext(ctx, "INSERT INTO Withdrawals (user_id, sum, order_id) VALUES ($1, $2, $3);",
 		userID, sum, orderID)
 	if err != nil {
