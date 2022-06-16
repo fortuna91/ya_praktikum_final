@@ -149,6 +149,7 @@ func GetOrders(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Error sending the response", http.StatusInternalServerError)
 		return
 	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	_, errBody := w.Write(bodyResp)
 	if errBody != nil {
