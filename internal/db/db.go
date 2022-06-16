@@ -117,7 +117,7 @@ func (db *DBStorage) AddOrder(ctx context.Context, id string, userID int64, stat
 }
 
 func (db *DBStorage) UpdateOrder(ctx context.Context, id string, status string, accrual float64) error {
-	_, err := db.dbConnection.ExecContext(ctx, "INSERT INTO Orders (id, status, accrual) VALUES ($1, $2, $3, $4)"+
+	_, err := db.dbConnection.ExecContext(ctx, "INSERT INTO Orders (id, status, accrual) VALUES ($1, $2, $3)"+
 		"ON CONFLICT (id) DO UPDATE SET status = excluded.status, accrual = excluded.accrual;",
 		id, status, accrual)
 	if err != nil {

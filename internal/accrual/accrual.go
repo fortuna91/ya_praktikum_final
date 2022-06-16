@@ -111,8 +111,8 @@ func (queue *QueueAccrualSystem) UpdateOrders(db *db.DBStorage) {
 	for {
 		order := queue.Pop()
 		if order != nil {
-			fmt.Printf("Get order from accrual system %v\n", order)
 			accrualOrder, retryAfter := updateOrder(db, queue.AccrualSystemAddress, order.ID, order.UserID)
+			fmt.Printf("Get order from accrual system %v\n", accrualOrder)
 			if retryAfter > 0 {
 				queue.RetryAfter = retryAfter
 				queue.Append(*order)
