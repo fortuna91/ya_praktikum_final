@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-var DB *db.DbStorage
+var DB *db.DBStorage
 var Queue = accrual.QueueAccrualSystem{}
 
 const NewStatus = "NEW"
@@ -29,7 +29,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	userRequest := db.UserData{}
-	if errJson := json.Unmarshal(*respBody, &userRequest); errJson != nil {
+	if errJSON := json.Unmarshal(*respBody, &userRequest); errJSON != nil {
 		http.Error(w, "Wrong request", http.StatusBadRequest)
 		return
 	}
@@ -48,7 +48,18 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+
+	signedToken, err := auth.SetToken(newUser)
+	if err != nil {
+		http.Error(w, "Error sending the response", http.StatusInternalServerError)
+		return
+	}
 	w.WriteHeader(http.StatusOK)
+
+	if _, errBody := w.Write([]byte(signedToken)); errBody != nil {
+		log.Printf("Error sending the response: %v\n", errBody)
+		http.Error(w, "Error sending the response", http.StatusInternalServerError)
+	}
 }
 
 func Login(w http.ResponseWriter, r *http.Request) {
@@ -60,7 +71,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	userRequest := db.UserData{}
-	if errJson := json.Unmarshal(*respBody, &userRequest); errJson != nil {
+	if errJSON := json.Unmarshal(*respBody, &userRequest); errJSON != nil {
 		http.Error(w, "Wrong request", http.StatusBadRequest)
 		return
 	}
@@ -95,31 +106,31 @@ func UploadOrder(w http.ResponseWriter, r *http.Request) {
 	token, _ := auth.GetTokenFromHeader(r)
 	login, _ := auth.ParseToken(token)
 	user := DB.GetUser(ctx, login)
-	orderId := string(*utils.GetBody(r.Body))
-	intOrderId, err := strconv.ParseInt(orderId, 10, 64)
+	orderID := string(*utils.GetBody(r.Body))
+	intOrderID, err := strconv.ParseInt(orderID, 10, 64)
 	if err != nil {
 		http.Error(w, "wrong order format", http.StatusUnprocessableEntity)
 		return
 	}
-	if !luhn.Valid(int(intOrderId)) {
+	if !luhn.Valid(int(intOrderID)) {
 		http.Error(w, "wrong order format, luhn", http.StatusUnprocessableEntity)
 		return
 	}
-	orderDB := DB.GetOrder(ctx, orderId)
+	orderDB := DB.GetOrder(ctx, orderID)
 	if orderDB != nil {
-		if orderDB.UserId != user.ID {
+		if orderDB.UserID != user.ID {
 			http.Error(w, "order belongs to another user", http.StatusConflict)
 		} else {
-			fmt.Printf("Order %s exists\n", orderId)
+			fmt.Printf("Order %s exists\n", orderID)
 			w.WriteHeader(http.StatusOK)
 		}
 		return
 	}
-	if errAdd := DB.AddOrder(ctx, orderId, user.ID, NewStatus); errAdd != nil {
+	if errAdd := DB.AddOrder(ctx, orderID, user.ID, NewStatus); errAdd != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	Queue.Append(*DB.GetOrder(ctx, orderId))
+	Queue.Append(*DB.GetOrder(ctx, orderID))
 	w.WriteHeader(http.StatusAccepted)
 }
 func GetOrders(w http.ResponseWriter, r *http.Request) {
@@ -141,7 +152,7 @@ func GetOrders(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Error sending the response", http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusOK)
 	_, errBody := w.Write(bodyResp)
 	if errBody != nil {
@@ -193,8 +204,8 @@ func Withdraw(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	withdrawalRequest := db.WithdrawalsData{}
-	if errJson := json.Unmarshal(*respBody, &withdrawalRequest); errJson != nil {
-		http.Error(w, errJson.Error(), http.StatusBadRequest) //"wrong request",
+	if errJSON := json.Unmarshal(*respBody, &withdrawalRequest); errJSON != nil {
+		http.Error(w, errJSON.Error(), http.StatusBadRequest) //"wrong request",
 		return
 	}
 	currBalance := DB.GetBalance(ctx, user.ID)
@@ -208,16 +219,16 @@ func Withdraw(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "not enough balance", http.StatusPaymentRequired)
 		return
 	}
-	intOrderId, err := strconv.Atoi(withdrawalRequest.OrderId)
+	intOrderID, err := strconv.Atoi(withdrawalRequest.OrderID)
 	if err != nil {
 		http.Error(w, "wrong order format", http.StatusUnprocessableEntity)
 		return
 	}
-	if !luhn.Valid(intOrderId) {
+	if !luhn.Valid(intOrderID) {
 		http.Error(w, "wrong order format", http.StatusUnprocessableEntity)
 		return
 	}
-	if err := DB.AddWithdrawal(ctx, user.ID, withdrawalRequest.Sum, withdrawalRequest.OrderId); err != nil {
+	if err := DB.AddWithdrawal(ctx, user.ID, withdrawalRequest.Sum, withdrawalRequest.OrderID); err != nil {
 		log.Printf("Couldn't add withdrawal %v\n", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return

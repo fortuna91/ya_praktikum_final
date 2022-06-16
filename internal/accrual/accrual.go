@@ -15,9 +15,9 @@ import (
 
 const (
 	REGISTERED string = "REGISTERED"
-	INVALID           = "INVALID"
-	PROCESSING        = "PROCESSING"
-	PROCESSED         = "PROCESSED"
+	PROCESSING string = "PROCESSING"
+	// INVALID           = "INVALID"
+	// PROCESSED         = "PROCESSED"
 )
 
 type QueueAccrualSystem struct {
@@ -37,9 +37,9 @@ func sendRequest(client *http.Client, request *http.Request) *http.Response {
 	return response
 }
 
-func getAccrual(accrualSystemAddress string, orderId string) (*db.OrderData, int) {
+func getAccrual(accrualSystemAddress string, orderID string) (*db.OrderData, int) {
 	client := http.Client{}
-	request, _ := http.NewRequest(http.MethodGet, "http://"+accrualSystemAddress+"/api/orders/"+orderId, nil)
+	request, _ := http.NewRequest(http.MethodGet, "http://"+accrualSystemAddress+"/api/orders/"+orderID, nil)
 	response := sendRequest(&client, request)
 	if response == nil {
 		log.Println("Error in getting accrual")
@@ -59,17 +59,17 @@ func getAccrual(accrualSystemAddress string, orderId string) (*db.OrderData, int
 	orderResponse := db.OrderData{}
 	defer response.Body.Close()
 	respBody := utils.GetBody(response.Body)
-	if errJson := json.Unmarshal(*respBody, &orderResponse); errJson != nil {
-		log.Println(errJson.Error())
+	if errJSON := json.Unmarshal(*respBody, &orderResponse); errJSON != nil {
+		log.Println(errJSON.Error())
 		return nil, 0
 	}
 	return &orderResponse, 0
 }
 
-func updateOrder(db *db.DbStorage, accrualSystemAddress string, orderId string, userId int64) (*db.OrderData, int) {
+func updateOrder(db *db.DBStorage, accrualSystemAddress string, orderID string, userID int64) (*db.OrderData, int) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	order, retryAfter := getAccrual(accrualSystemAddress, orderId)
+	order, retryAfter := getAccrual(accrualSystemAddress, orderID)
 	if order == nil {
 		return nil, retryAfter
 	}
@@ -77,13 +77,13 @@ func updateOrder(db *db.DbStorage, accrualSystemAddress string, orderId string, 
 	if order.Status == REGISTERED {
 		status = PROCESSING
 	}
-	if err := db.UpdateOrder(ctx, orderId, status, order.Accrual); err != nil {
+	if err := db.UpdateOrder(ctx, orderID, status, order.Accrual); err != nil {
 		fmt.Println(err.Error())
 		return nil, 0
 	}
-	balance := db.GetBalance(ctx, userId)
+	balance := db.GetBalance(ctx, userID)
 	newBalance := balance.Current + order.Accrual
-	if err := db.UpdateBalance(ctx, userId, newBalance, balance.Withdrawn); err != nil {
+	if err := db.UpdateBalance(ctx, userID, newBalance, balance.Withdrawn); err != nil {
 		fmt.Println(err.Error())
 		return nil, 0
 	}
@@ -107,12 +107,12 @@ func (queue *QueueAccrualSystem) Pop() *db.OrderData {
 	return &order
 }
 
-func (queue *QueueAccrualSystem) UpdateOrders(db *db.DbStorage) {
-	for true {
+func (queue *QueueAccrualSystem) UpdateOrders(db *db.DBStorage) {
+	for {
 		order := queue.Pop()
 		if order != nil {
 			fmt.Printf("Get order from accrual system %v\n", order)
-			accrualOrder, retryAfter := updateOrder(db, queue.AccrualSystemAddress, order.ID, order.UserId)
+			accrualOrder, retryAfter := updateOrder(db, queue.AccrualSystemAddress, order.ID, order.UserID)
 			if retryAfter > 0 {
 				queue.RetryAfter = retryAfter
 				queue.Append(*order)

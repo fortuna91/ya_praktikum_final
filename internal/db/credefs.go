@@ -2,7 +2,7 @@ package db
 
 import "context"
 
-func (db *DbStorage) CreateUsers(ctx context.Context) {
+func (db *DBStorage) CreateUsers(ctx context.Context) {
 	query := "CREATE TABLE IF NOT EXISTS Users (" +
 		"id SERIAL PRIMARY KEY," +
 		"login varchar(50) NOT NULL," +
@@ -14,7 +14,7 @@ func (db *DbStorage) CreateUsers(ctx context.Context) {
 	}
 }
 
-func (db *DbStorage) CreateOrders(ctx context.Context) {
+func (db *DBStorage) CreateOrders(ctx context.Context) {
 	query := "CREATE TABLE IF NOT EXISTS Orders (" +
 		"id varchar(50) NOT NULL," +
 		"user_id bigint NOT NULL," +
@@ -31,7 +31,7 @@ func (db *DbStorage) CreateOrders(ctx context.Context) {
 	}
 }
 
-func (db *DbStorage) CreateBalance(ctx context.Context) {
+func (db *DBStorage) CreateBalance(ctx context.Context) {
 	query := "CREATE TABLE IF NOT EXISTS Balances (" +
 		"user_id bigint NOT NULL," +
 		"current real DEFAULT 0," +
@@ -43,7 +43,7 @@ func (db *DbStorage) CreateBalance(ctx context.Context) {
 	}
 }
 
-func (db *DbStorage) CreateWithdrawals(ctx context.Context) {
+func (db *DBStorage) CreateWithdrawals(ctx context.Context) {
 	query := "CREATE TABLE IF NOT EXISTS Withdrawals (" +
 		"user_id bigint NOT NULL," +
 		"sum real," +

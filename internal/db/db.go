@@ -20,7 +20,7 @@ type UserData struct {
 
 type OrderData struct {
 	ID         string    `json:"number,omitempty"`
-	UserId     int64     `json:"-"`
+	UserID     int64     `json:"-"`
 	Status     string    `json:"status"`
 	Accrual    float64   `json:"accrual,omitempty"`
 	UploadedAt time.Time `json:"uploaded_at"`
@@ -29,44 +29,44 @@ type OrderData struct {
 }
 
 type BalanceData struct {
-	UserId    int64   `json:"-"`
+	UserID    int64   `json:"-"`
 	Current   float64 `json:"current"`
 	Withdrawn float64 `json:"withdrawn"`
 }
 
 type WithdrawalsData struct {
-	UserId      int64     `json:"-"`
+	UserID      int64     `json:"-"`
 	Sum         float64   `json:"sum"`
 	ProcessedAt time.Time `json:"processed_at"`
-	OrderId     string    `json:"order"`
+	OrderID     string    `json:"order"`
 }
 
-type DbStorage struct {
+type DBStorage struct {
 	dbConnection *sql.DB
 }
 
-func New(dbAddress string) *DbStorage {
+func New(dbAddress string) *DBStorage {
 	dbConn, err := sql.Open("pgx", dbAddress)
 	if err != nil {
 		panic(err)
 	}
-	return &DbStorage{
+	return &DBStorage{
 		dbConnection: dbConn,
 	}
 }
 
-func (db *DbStorage) Create(ctx context.Context) {
+func (db *DBStorage) Create(ctx context.Context) {
 	db.CreateUsers(ctx)
 	db.CreateBalance(ctx)
 	db.CreateOrders(ctx)
 	db.CreateWithdrawals(ctx)
 }
 
-func (db *DbStorage) Close() {
+func (db *DBStorage) Close() {
 	db.dbConnection.Close()
 }
 
-func (db *DbStorage) GetUser(ctx context.Context, login string) *UserData {
+func (db *DBStorage) GetUser(ctx context.Context, login string) *UserData {
 	user := UserData{}
 
 	err := db.dbConnection.QueryRowContext(ctx, "SELECT * FROM Users WHERE login=$1", login).Scan(&user.ID, &user.Login, &user.Password)
@@ -77,7 +77,7 @@ func (db *DbStorage) GetUser(ctx context.Context, login string) *UserData {
 	return &user
 }
 
-func (db *DbStorage) AddUser(ctx context.Context, login string, password string) error {
+func (db *DBStorage) AddUser(ctx context.Context, login string, password string) error {
 	_, err := db.dbConnection.ExecContext(ctx, "INSERT INTO Users (login, password) VALUES ($1, $2);",
 		login, password)
 	if err != nil {
@@ -86,15 +86,15 @@ func (db *DbStorage) AddUser(ctx context.Context, login string, password string)
 	return nil
 }
 
-func (db *DbStorage) GetOrder(ctx context.Context, orderId string) *OrderData {
+func (db *DBStorage) GetOrder(ctx context.Context, orderID string) *OrderData {
 	order := OrderData{}
 	var status sql.NullString
 	var accrual sql.NullFloat64
 
-	err := db.dbConnection.QueryRowContext(ctx, "SELECT * FROM Orders WHERE id=$1", orderId).
-		Scan(&order.ID, &order.UserId, &status, &accrual, &order.UploadedAt)
+	err := db.dbConnection.QueryRowContext(ctx, "SELECT * FROM Orders WHERE id=$1", orderID).
+		Scan(&order.ID, &order.UserID, &status, &accrual, &order.UploadedAt)
 	if err != nil {
-		log.Printf("Order %s doesn't exist. %s\n", orderId, err)
+		log.Printf("Order %s doesn't exist. %s\n", orderID, err)
 		return nil
 	}
 	if status.Valid {
@@ -106,9 +106,9 @@ func (db *DbStorage) GetOrder(ctx context.Context, orderId string) *OrderData {
 	return &order
 }
 
-func (db *DbStorage) AddOrder(ctx context.Context, id string, userId int64, status string) error {
+func (db *DBStorage) AddOrder(ctx context.Context, id string, userID int64, status string) error {
 	_, err := db.dbConnection.ExecContext(ctx, "INSERT INTO Orders (id, user_id, status) VALUES ($1, $2, $3);",
-		id, userId, status)
+		id, userID, status)
 	if err != nil {
 		return fmt.Errorf("couldn't add order %s into DB: %s", id, err)
 	}
@@ -116,7 +116,7 @@ func (db *DbStorage) AddOrder(ctx context.Context, id string, userId int64, stat
 	return nil
 }
 
-func (db *DbStorage) UpdateOrder(ctx context.Context, id string, status string, accrual float64) error {
+func (db *DBStorage) UpdateOrder(ctx context.Context, id string, status string, accrual float64) error {
 	_, err := db.dbConnection.ExecContext(ctx, "INSERT INTO Orders (id, status, accrual) VALUES ($1, $2, $3, $4)"+
 		"ON CONFLICT (id) DO UPDATE SET status = excluded.status, accrual = excluded.accrual;",
 		id, status, accrual)
@@ -127,12 +127,12 @@ func (db *DbStorage) UpdateOrder(ctx context.Context, id string, status string, 
 	return nil
 }
 
-func (db *DbStorage) GetOrders(ctx context.Context, userId int64) []OrderData {
+func (db *DBStorage) GetOrders(ctx context.Context, userID int64) []OrderData {
 	var orders []OrderData
 	var status sql.NullString
 	var accrual sql.NullFloat64
 
-	rows, err := db.dbConnection.QueryContext(ctx, "SELECT * FROM Orders WHERE user_id=$1 ORDER BY uploaded_at", userId)
+	rows, err := db.dbConnection.QueryContext(ctx, "SELECT * FROM Orders WHERE user_id=$1 ORDER BY uploaded_at", userID)
 	if err != nil {
 		log.Printf("Couldn't read orders for user. %s\n", err)
 		return nil
@@ -140,7 +140,7 @@ func (db *DbStorage) GetOrders(ctx context.Context, userId int64) []OrderData {
 
 	for rows.Next() {
 		order := OrderData{}
-		err = rows.Scan(&order.ID, &order.UserId, &status, &accrual, &order.UploadedAt)
+		err = rows.Scan(&order.ID, &order.UserID, &status, &accrual, &order.UploadedAt)
 		if err != nil {
 			log.Printf("Couldn't set order %d from DB: %s\n", order.ID, err)
 			return nil
@@ -153,45 +153,48 @@ func (db *DbStorage) GetOrders(ctx context.Context, userId int64) []OrderData {
 		}
 		orders = append(orders, order)
 	}
+	if rows.Err() != nil {
+		return nil
+	}
 
 	return orders
 }
 
-func (db *DbStorage) UpdateBalance(ctx context.Context, userId int64, current float64, withdrawn float64) error {
+func (db *DBStorage) UpdateBalance(ctx context.Context, userID int64, current float64, withdrawn float64) error {
 	_, err := db.dbConnection.ExecContext(ctx, "INSERT INTO Balances (user_id, current, withdrawn) VALUES ($1, $2, $3) ON CONFLICT (user_id) DO UPDATE SET current = excluded.current, withdrawn = excluded.withdrawn",
-		userId, current, withdrawn)
+		userID, current, withdrawn)
 	if err != nil {
 		return err
 	}
-	log.Printf("Update balance for user %d\n", userId)
+	log.Printf("Update balance for user %d\n", userID)
 	return nil
 }
 
-func (db *DbStorage) GetBalance(ctx context.Context, userId int64) *BalanceData {
+func (db *DBStorage) GetBalance(ctx context.Context, userID int64) *BalanceData {
 	balance := BalanceData{}
-	err := db.dbConnection.QueryRowContext(ctx, "SELECT * FROM Balances WHERE user_id=$1", userId).
-		Scan(&balance.UserId, &balance.Current, &balance.Withdrawn)
+	err := db.dbConnection.QueryRowContext(ctx, "SELECT * FROM Balances WHERE user_id=$1", userID).
+		Scan(&balance.UserID, &balance.Current, &balance.Withdrawn)
 	if err != nil {
-		log.Printf("There is no balance data for user %d: %v\n", userId, err)
+		log.Printf("There is no balance data for user %d: %v\n", userID, err)
 		return nil
 	}
 	return &balance
 }
 
-func (db *DbStorage) AddWithdrawal(ctx context.Context, userId int64, sum float64, orderID string) error {
+func (db *DBStorage) AddWithdrawal(ctx context.Context, userID int64, sum float64, orderID string) error {
 	_, err := db.dbConnection.ExecContext(ctx, "INSERT INTO Withdrawals (user_id, sum, order_id VALUES ($1, $2, $3);",
-		userId, sum, orderID)
+		userID, sum, orderID)
 	if err != nil {
 		return err
 	}
-	log.Printf("Add withdrawal for user %d\n", userId)
+	log.Printf("Add withdrawal for user %d\n", userID)
 	return nil
 }
 
-func (db *DbStorage) GetWithdrawals(ctx context.Context, userId int64) []WithdrawalsData {
+func (db *DBStorage) GetWithdrawals(ctx context.Context, userID int64) []WithdrawalsData {
 	var withdrawals []WithdrawalsData
 
-	rows, err := db.dbConnection.QueryContext(ctx, "SELECT * FROM Withdrawals WHERE user_id=$1 ORDER BY processed_at", userId)
+	rows, err := db.dbConnection.QueryContext(ctx, "SELECT * FROM Withdrawals WHERE user_id=$1 ORDER BY processed_at", userID)
 	if err != nil {
 		log.Printf("Couldn't read withdrawals for user. %s\n", err)
 		return nil
@@ -199,12 +202,15 @@ func (db *DbStorage) GetWithdrawals(ctx context.Context, userId int64) []Withdra
 
 	for rows.Next() {
 		withdrawal := WithdrawalsData{}
-		err = rows.Scan(&withdrawal.UserId, &withdrawal.Sum, &withdrawal.ProcessedAt, &withdrawal.OrderId)
+		err = rows.Scan(&withdrawal.UserID, &withdrawal.Sum, &withdrawal.ProcessedAt, &withdrawal.OrderID)
 		if err != nil {
 			log.Printf("Couldn't set withdrawal from DB: %v\n", err)
 			return nil
 		}
 		withdrawals = append(withdrawals, withdrawal)
+	}
+	if rows.Err() != nil {
+		return nil
 	}
 	return withdrawals
 }
