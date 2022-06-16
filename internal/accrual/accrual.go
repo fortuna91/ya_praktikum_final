@@ -70,6 +70,7 @@ func updateOrder(db *db.DBStorage, accrualSystemAddress string, orderID string, 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	order, retryAfter := getAccrual(accrualSystemAddress, orderID)
+	fmt.Printf("Get order from accrual system %v\n", order)
 	if order == nil {
 		return nil, retryAfter
 	}
@@ -77,7 +78,7 @@ func updateOrder(db *db.DBStorage, accrualSystemAddress string, orderID string, 
 	if order.Status == REGISTERED {
 		status = PROCESSING
 	}
-	if err := db.UpdateOrder(ctx, orderID, status, order.Accrual); err != nil {
+	if err := db.UpdateOrder(ctx, orderID, userID, status, order.Accrual); err != nil {
 		fmt.Println(err.Error())
 		return nil, 0
 	}
@@ -112,7 +113,6 @@ func (queue *QueueAccrualSystem) UpdateOrders(db *db.DBStorage) {
 		order := queue.Pop()
 		if order != nil {
 			accrualOrder, retryAfter := updateOrder(db, queue.AccrualSystemAddress, order.ID, order.UserID)
-			fmt.Printf("Get order from accrual system %v\n", accrualOrder)
 			if retryAfter > 0 {
 				queue.RetryAfter = retryAfter
 				queue.Append(*order)

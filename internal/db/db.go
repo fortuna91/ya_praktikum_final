@@ -116,10 +116,10 @@ func (db *DBStorage) AddOrder(ctx context.Context, id string, userID int64, stat
 	return nil
 }
 
-func (db *DBStorage) UpdateOrder(ctx context.Context, id string, status string, accrual float64) error {
-	_, err := db.dbConnection.ExecContext(ctx, "INSERT INTO Orders (id, status, accrual) VALUES ($1, $2, $3)"+
+func (db *DBStorage) UpdateOrder(ctx context.Context, id string, userID int64, status string, accrual float64) error {
+	_, err := db.dbConnection.ExecContext(ctx, "INSERT INTO Orders (id, user_id, status, accrual) VALUES ($1, $2, $3, $4)"+
 		"ON CONFLICT (id) DO UPDATE SET status = excluded.status, accrual = excluded.accrual;",
-		id, status, accrual)
+		id, userID, status, accrual)
 	if err != nil {
 		return fmt.Errorf("couldn't update order %s into DB: %s", id, err)
 	}
