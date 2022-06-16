@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/dgrijalva/jwt-go/v4"
 	"log"
-	"math"
 	"time"
 
 	_ "github.com/jackc/pgx/v4/stdlib"
@@ -162,8 +161,6 @@ func (db *DBStorage) GetOrders(ctx context.Context, userID int64) []OrderData {
 }
 
 func (db *DBStorage) UpdateBalance(ctx context.Context, userID int64, current float32, withdrawn float32) error {
-	current = float32(math.Round(float64(current*100)) / 100)
-	withdrawn = float32(math.Round(float64(withdrawn*100)) / 100)
 	_, err := db.dbConnection.ExecContext(ctx, "INSERT INTO Balances (user_id, current, withdrawn) VALUES ($1, $2, $3) ON CONFLICT (user_id) DO UPDATE SET current = excluded.current, withdrawn = excluded.withdrawn",
 		userID, current, withdrawn)
 	if err != nil {
@@ -181,12 +178,11 @@ func (db *DBStorage) GetBalance(ctx context.Context, userID int64) *BalanceData 
 		log.Printf("There is no balance data for user %d: %v\n", userID, err)
 		return nil
 	}
-	fmt.Printf("Get balance for %d: %v\n", userID, balance)
+	fmt.Printf("Get balance for user %d: %v\n", userID, balance)
 	return &balance
 }
 
 func (db *DBStorage) AddWithdrawal(ctx context.Context, userID int64, sum float32, orderID string) error {
-	sum = float32(math.Round(float64(sum*100)) / 100)
 	_, err := db.dbConnection.ExecContext(ctx, "INSERT INTO Withdrawals (user_id, sum, order_id) VALUES ($1, $2, $3);",
 		userID, sum, orderID)
 	if err != nil {

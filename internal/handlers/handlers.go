@@ -173,7 +173,7 @@ func GetBalance(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	bodyResp, err := json.Marshal(balanceDB)
+	bodyResp, err := json.Marshal(*balanceDB)
 	if err != nil {
 		log.Printf("Cannot convert Balance to JSON: %v", err)
 		http.Error(w, "Error sending the response", http.StatusInternalServerError)
@@ -181,6 +181,7 @@ func GetBalance(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusOK)
 	_, errBody := w.Write(bodyResp)
+	fmt.Printf("balance body %v\n", bodyResp)
 	if errBody != nil {
 		log.Printf("Error sending the response: %v\n", errBody)
 		http.Error(w, "Error sending the response", http.StatusInternalServerError)
