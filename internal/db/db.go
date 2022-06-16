@@ -142,7 +142,7 @@ func (db *DBStorage) GetOrders(ctx context.Context, userID int64) []OrderData {
 		order := OrderData{}
 		err = rows.Scan(&order.ID, &order.UserID, &status, &accrual, &order.UploadedAt)
 		if err != nil {
-			log.Printf("Couldn't set order %d from DB: %s\n", order.ID, err)
+			log.Printf("Couldn't set order %s from DB: %s\n", order.ID, err)
 			return nil
 		}
 		if status.Valid {

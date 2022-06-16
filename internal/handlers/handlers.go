@@ -55,11 +55,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusOK)
-
-	if _, errBody := w.Write([]byte(signedToken)); errBody != nil {
-		log.Printf("Error sending the response: %v\n", errBody)
-		http.Error(w, "Error sending the response", http.StatusInternalServerError)
-	}
+	w.Header().Set("Authorization", "Bearer "+signedToken)
 }
 
 func Login(w http.ResponseWriter, r *http.Request) {
@@ -92,11 +88,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusOK)
-
-	if _, errBody := w.Write([]byte(signedToken)); errBody != nil {
-		log.Printf("Error sending the response: %v\n", errBody)
-		http.Error(w, "Error sending the response", http.StatusInternalServerError)
-	}
+	w.Header().Set("Authorization", "Bearer "+signedToken)
 }
 
 func UploadOrder(w http.ResponseWriter, r *http.Request) {
