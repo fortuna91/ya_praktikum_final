@@ -166,7 +166,7 @@ func (db *DBStorage) UpdateBalance(ctx context.Context, userID int64, current fl
 	if err != nil {
 		return err
 	}
-	log.Printf("Update balance for user %d\n", userID)
+	log.Printf("Update balance for user %d. Current = %f\n", userID, current)
 	return nil
 }
 
@@ -182,7 +182,7 @@ func (db *DBStorage) GetBalance(ctx context.Context, userID int64) *BalanceData 
 }
 
 func (db *DBStorage) AddWithdrawal(ctx context.Context, userID int64, sum float64, orderID string) error {
-	_, err := db.dbConnection.ExecContext(ctx, "INSERT INTO Withdrawals (user_id, sum, order_id VALUES ($1, $2, $3);",
+	_, err := db.dbConnection.ExecContext(ctx, "INSERT INTO Withdrawals (user_id, sum, order_id) VALUES ($1, $2, $3);",
 		userID, sum, orderID)
 	if err != nil {
 		return err
