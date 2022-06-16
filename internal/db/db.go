@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/dgrijalva/jwt-go/v4"
 	"log"
+	"math"
 	"time"
 
 	_ "github.com/jackc/pgx/v4/stdlib"
@@ -161,6 +162,7 @@ func (db *DBStorage) GetOrders(ctx context.Context, userID int64) []OrderData {
 }
 
 func (db *DBStorage) UpdateBalance(ctx context.Context, userID int64, current float64, withdrawn float64) error {
+	current = math.Round(current)
 	_, err := db.dbConnection.ExecContext(ctx, "INSERT INTO Balances (user_id, current, withdrawn) VALUES ($1, $2, $3) ON CONFLICT (user_id) DO UPDATE SET current = excluded.current, withdrawn = excluded.withdrawn",
 		userID, current, withdrawn)
 	if err != nil {
@@ -178,6 +180,7 @@ func (db *DBStorage) GetBalance(ctx context.Context, userID int64) *BalanceData 
 		log.Printf("There is no balance data for user %d: %v\n", userID, err)
 		return nil
 	}
+	fmt.Printf("Get balance for %d: %v\n", userID, balance)
 	return &balance
 }
 
