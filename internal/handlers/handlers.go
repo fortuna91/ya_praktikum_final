@@ -63,7 +63,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 	defer cancel()
 	r.Header.Add("Content-Type", "application/json; charset=utf-8")
-	
+
 	respBody := utils.GetBody(r.Body)
 	if respBody == nil {
 		http.Error(w, "Couldn't read body", http.StatusInternalServerError)
@@ -131,6 +131,7 @@ func UploadOrder(w http.ResponseWriter, r *http.Request) {
 func GetOrders(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 	defer cancel()
+	r.Header.Add("Content-Type", "application/json; charset=utf-8")
 
 	token, _ := auth.GetTokenFromHeader(r)
 	login, _ := auth.ParseToken(token)
@@ -147,7 +148,6 @@ func GetOrders(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Error sending the response", http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusOK)
 	_, errBody := w.Write(bodyResp)
 	if errBody != nil {
@@ -160,6 +160,7 @@ func GetOrders(w http.ResponseWriter, r *http.Request) {
 func GetBalance(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 	defer cancel()
+	r.Header.Add("Content-Type", "application/json; charset=utf-8")
 
 	token, _ := auth.GetTokenFromHeader(r)
 	login, _ := auth.ParseToken(token)
@@ -176,7 +177,6 @@ func GetBalance(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Error sending the response", http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_, errBody := w.Write(bodyResp)
 	if errBody != nil {
@@ -240,6 +240,7 @@ func Withdraw(w http.ResponseWriter, r *http.Request) {
 func GetWithdrawals(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 	defer cancel()
+	r.Header.Add("Content-Type", "application/json; charset=utf-8")
 
 	token, _ := auth.GetTokenFromHeader(r)
 	login, _ := auth.ParseToken(token)
@@ -256,7 +257,6 @@ func GetWithdrawals(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Error sending the response", http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_, errBody := w.Write(bodyResp)
 	if errBody != nil {
