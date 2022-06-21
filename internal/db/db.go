@@ -144,6 +144,7 @@ func (db *DBStorage) UpdateBalance(ctx context.Context, userID int64, accrual fl
 	if err != nil {
 		return err
 	}
+	fmt.Printf("Update balance for user %d. Add to current = %f\n", userID, accrual)
 	log.Info().Msgf("Update balance for user %d. Add to current = %f\n", userID, accrual)
 	return nil
 }
@@ -154,7 +155,8 @@ func (db *DBStorage) Withdraw(ctx context.Context, userID int64, withdrawn float
 	if err != nil {
 		return err
 	}
-	log.Info().Msgf("Update balance for user %d. Add to current = %f\n", userID, sum)
+	fmt.Printf("Update balance for user %d. withdrawn = %f, sum = %f\n", userID, withdrawn, sum)
+	log.Info().Msgf("Update balance for user %d. withdrawn = %f, sum = %f\n", userID, withdrawn, sum)
 	return nil
 }
 
