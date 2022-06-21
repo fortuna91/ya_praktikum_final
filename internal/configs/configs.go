@@ -16,6 +16,7 @@ type ServerConfig struct {
 	ContextCancel      time.Duration `env:"CANCEL_INTERVAL" envDefault:"2s"`
 	TokenDuration      time.Duration `env:"TOKEN_DURATION" envDefault:"1h"`
 	AccrualChannelPool int           `env:"ACCRUAL_CHANNEL_POOL" envDefault:"100"`
+	HashKey            string        `env:"HASH_KEY" envDefault:"someKey"`
 }
 
 func SetServerConfig() ServerConfig {

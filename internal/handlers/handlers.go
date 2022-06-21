@@ -4,17 +4,21 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/theplant/luhn"
+	"net/http"
+	"strconv"
+	"time"
+
+	"github.com/rs/zerolog/log"
+
 	"github.com/fortuna91/ya_praktikum_final/internal/accrual"
 	"github.com/fortuna91/ya_praktikum_final/internal/auth"
 	"github.com/fortuna91/ya_praktikum_final/internal/body"
 	"github.com/fortuna91/ya_praktikum_final/internal/db"
 	"github.com/fortuna91/ya_praktikum_final/internal/entity"
-	"github.com/theplant/luhn"
-	"log"
-	"net/http"
-	"strconv"
-	"time"
 )
+
+var HashKey string
 
 var dbStorage *db.DBStorage
 var ContextCancelTimeout time.Duration
@@ -67,7 +71,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
 	}
 	newUser := dbStorage.GetUser(ctx, userRequest.Login)
 	if err := dbStorage.AddBalance(ctx, newUser.ID); err != nil {
-		log.Printf("Couldn't add balance: %v\n", err)
+		log.Error().Msgf("Couldn't add balance: %v", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
@@ -101,8 +105,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Login doesn't exist", http.StatusUnauthorized)
 		return
 	}
-	// TODO decode password
-	if auth.CalcHash("someKey", userRequest.Password) != userDB.Password {
+	if auth.CalcHash(HashKey, userRequest.Password) != userDB.Password {
 		http.Error(w, "Wrong password", http.StatusUnauthorized)
 		return
 	}
@@ -139,7 +142,7 @@ func UploadOrder(w http.ResponseWriter, r *http.Request) {
 		if orderDB.UserID != user.ID {
 			http.Error(w, "order belongs to another user", http.StatusConflict)
 		} else {
-			fmt.Printf("Order %s exists\n", orderID)
+			log.Warn().Msgf("Order %s exists\n", orderID)
 			w.WriteHeader(http.StatusOK)
 		}
 		return
@@ -162,20 +165,20 @@ func GetOrders(w http.ResponseWriter, r *http.Request) {
 	ordersDB := dbStorage.GetOrders(ctx, user.ID)
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	if ordersDB == nil {
-		log.Println("No orders for user")
+		log.Warn().Msg("No orders for user")
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
 	bodyResp, err := json.Marshal(ordersDB)
 	if err != nil {
-		log.Printf("Cannot convert Orders to JSON: %v", err)
+		log.Error().Msgf("Cannot convert Orders to JSON: %v", err)
 		http.Error(w, "Error sending the response", http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(http.StatusOK)
 	_, errBody := w.Write(bodyResp)
 	if errBody != nil {
-		log.Printf("Error sending the response: %v\n", errBody)
+		log.Error().Msgf("Error sending the response: %v\n", errBody)
 		http.Error(w, "Error sending the response", http.StatusInternalServerError)
 		return
 	}
@@ -190,13 +193,13 @@ func GetBalance(w http.ResponseWriter, r *http.Request) {
 	user := dbStorage.GetUser(ctx, login)
 	balanceDB := dbStorage.GetBalance(ctx, user.ID)
 	if balanceDB == nil {
-		log.Println("No balance for user")
+		log.Warn().Msg("No balance for user")
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	bodyResp, err := json.Marshal(balanceDB)
 	if err != nil {
-		log.Printf("Cannot convert Balance to JSON: %v", err)
+		log.Error().Msgf("Cannot convert Balance to JSON: %v", err)
 		http.Error(w, "Error sending the response", http.StatusInternalServerError)
 		return
 	}
@@ -204,7 +207,7 @@ func GetBalance(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	_, errBody := w.Write(bodyResp)
 	if errBody != nil {
-		log.Printf("Error sending the response: %v\n", errBody)
+		log.Error().Msgf("Error sending the response: %v\n", errBody)
 		http.Error(w, "Error sending the response", http.StatusInternalServerError)
 		return
 	}
@@ -231,12 +234,12 @@ func Withdraw(w http.ResponseWriter, r *http.Request) {
 	}
 	currBalance := dbStorage.GetBalance(ctx, user.ID)
 	if currBalance == nil {
-		log.Println("Couldn't find balance")
+		log.Warn().Msg("Couldn't find balance")
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	if currBalance.Current < withdrawalRequest.Sum {
-		log.Printf("Not enough balance: %f < %f\n", currBalance.Current, withdrawalRequest.Sum)
+		log.Error().Msgf("Not enough balance: %f < %f\n", currBalance.Current, withdrawalRequest.Sum)
 		http.Error(w, "not enough balance", http.StatusPaymentRequired)
 		return
 	}
@@ -250,12 +253,12 @@ func Withdraw(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := dbStorage.AddWithdrawal(ctx, user.ID, withdrawalRequest.Sum, withdrawalRequest.OrderID); err != nil {
-		log.Printf("Couldn't add withdrawal %v\n", err)
+		log.Error().Msgf("Couldn't add withdrawal %v\n", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	if err := dbStorage.Withdraw(ctx, user.ID, currBalance.Withdrawn, withdrawalRequest.Sum); err != nil {
-		log.Printf("Couldn't update balance %v\n", err)
+		log.Error().Msgf("Couldn't update balance %v\n", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
@@ -272,20 +275,20 @@ func GetWithdrawals(w http.ResponseWriter, r *http.Request) {
 	user := dbStorage.GetUser(ctx, login)
 	withdrawalsDB := dbStorage.GetWithdrawals(ctx, user.ID)
 	if withdrawalsDB == nil {
-		log.Println("No withdrawals for user")
+		log.Warn().Msg("No withdrawals for user")
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
 	bodyResp, err := json.Marshal(withdrawalsDB)
 	if err != nil {
-		log.Printf("Cannot convert withdrawals to JSON: %v", err)
+		log.Error().Msgf("Cannot convert withdrawals to JSON: %v", err)
 		http.Error(w, "Error sending the response", http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(http.StatusOK)
 	_, errBody := w.Write(bodyResp)
 	if errBody != nil {
-		log.Printf("Error sending the response: %v\n", errBody)
+		log.Error().Msgf("Error sending the response: %v\n", errBody)
 		http.Error(w, "Error sending the response", http.StatusInternalServerError)
 		return
 	}

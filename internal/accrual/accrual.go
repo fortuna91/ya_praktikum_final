@@ -7,10 +7,11 @@ import (
 	"github.com/fortuna91/ya_praktikum_final/internal/body"
 	"github.com/fortuna91/ya_praktikum_final/internal/db"
 	"github.com/fortuna91/ya_praktikum_final/internal/entity"
-	"log"
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/rs/zerolog/log"
 )
 
 const (
@@ -30,7 +31,7 @@ func sendRequest(client *http.Client, request *http.Request) *http.Response {
 	request.Header.Set("Content-Length", "0")
 	response, err := client.Do(request)
 	if err != nil {
-		fmt.Println(err)
+		log.Err(err)
 		return nil
 	}
 	return response
@@ -41,7 +42,7 @@ func getAccrual(accrualSystemAddress string, orderID string) (*entity.Order, int
 	request, _ := http.NewRequest(http.MethodGet, accrualSystemAddress+"/api/orders/"+orderID, nil)
 	response := sendRequest(&client, request)
 	if response == nil {
-		log.Println("Error in getting accrual")
+		log.Error().Msg("Error in getting accrual")
 		return nil, 0
 	}
 	if response.StatusCode == http.StatusTooManyRequests {
@@ -49,17 +50,17 @@ func getAccrual(accrualSystemAddress string, orderID string) (*entity.Order, int
 		retryAfterInt, _ := strconv.Atoi(retryAfter)
 		return nil, retryAfterInt
 	} else if response.StatusCode == http.StatusNoContent {
-		fmt.Printf("No Content. Response code %d", response.StatusCode)
+		log.Warn().Msgf("No Content. Response code %d", response.StatusCode)
 		return nil, -1
 	} else if response.StatusCode != http.StatusOK {
-		fmt.Printf("Error in getting accrual. Response code %d", response.StatusCode)
+		log.Error().Msgf("Error in getting accrual. Response code %d", response.StatusCode)
 		return nil, 0
 	}
 	orderResponse := entity.Order{}
 	defer response.Body.Close()
 	respBody := body.GetBody(response.Body)
 	if errJSON := json.Unmarshal(*respBody, &orderResponse); errJSON != nil {
-		log.Println(errJSON.Error())
+		log.Error().Msg(errJSON.Error())
 		return nil, 0
 	}
 	return &orderResponse, 0
@@ -78,11 +79,11 @@ func updateOrder(db *db.DBStorage, accrualSystemAddress string, orderID string, 
 		status = PROCESSING
 	}*/ // no status REGISTERED in technical task
 	if err := db.UpdateOrder(ctx, orderID, userID, status, order.Accrual); err != nil {
-		fmt.Println(err.Error())
+		log.Err(err)
 		return nil, 0
 	}
 	if err := db.UpdateBalance(ctx, userID, order.Accrual); err != nil {
-		fmt.Println(err.Error())
+		log.Err(err)
 		return nil, 0
 	}
 	return order, 0

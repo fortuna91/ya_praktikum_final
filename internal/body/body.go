@@ -3,7 +3,8 @@ package body
 import (
 	"io"
 	"io/ioutil"
-	"log"
+
+	"github.com/rs/zerolog/log"
 )
 
 func GetBody(readerBody io.ReadCloser) *[]byte {
@@ -11,7 +12,7 @@ func GetBody(readerBody io.ReadCloser) *[]byte {
 
 	respBody, err := ioutil.ReadAll(readerBody)
 	if err != nil {
-		log.Printf("Couldn't read body %v\n", err)
+		log.Error().Msgf("Couldn't read body %v\n", err)
 		return nil
 	}
 	return &respBody

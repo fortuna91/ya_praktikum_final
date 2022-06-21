@@ -6,7 +6,8 @@ import (
 	"fmt"
 	"github.com/fortuna91/ya_praktikum_final/internal/entity"
 	_ "github.com/jackc/pgx/v4/stdlib"
-	"log"
+
+	"github.com/rs/zerolog/log"
 )
 
 type DBStorage struct {
@@ -39,7 +40,7 @@ func (db *DBStorage) GetUser(ctx context.Context, login string) *entity.User {
 
 	err := db.dbConnection.QueryRowContext(ctx, "SELECT * FROM Users WHERE login=$1", login).Scan(&user.ID, &user.Login, &user.Password)
 	if err != nil {
-		log.Printf("User with login %s doesn't exist. %s\n", login, err)
+		log.Warn().Msgf("User with login %s doesn't exist. %s\n", login, err)
 		return nil
 	}
 	return &user
@@ -62,7 +63,7 @@ func (db *DBStorage) GetOrder(ctx context.Context, orderID string) *entity.Order
 	err := db.dbConnection.QueryRowContext(ctx, "SELECT * FROM Orders WHERE id=$1", orderID).
 		Scan(&order.ID, &order.UserID, &status, &accrual, &order.UploadedAt)
 	if err != nil {
-		log.Printf("Order %s doesn't exist. %s\n", orderID, err)
+		log.Warn().Msgf("Order %s doesn't exist. %s\n", orderID, err)
 		return nil
 	}
 	if status.Valid {
@@ -80,7 +81,7 @@ func (db *DBStorage) AddOrder(ctx context.Context, id string, userID int64, stat
 	if err != nil {
 		return fmt.Errorf("couldn't add order %s into DB: %s", id, err)
 	}
-	fmt.Printf("Add order %s\n", id)
+	log.Info().Msgf("Add order %s\n", id)
 	return nil
 }
 
@@ -91,7 +92,7 @@ func (db *DBStorage) UpdateOrder(ctx context.Context, id string, userID int64, s
 	if err != nil {
 		return fmt.Errorf("couldn't update order %s into DB: %s", id, err)
 	}
-	fmt.Printf("Update order %s\n", id)
+	log.Info().Msgf("Update order %s\n", id)
 	return nil
 }
 
@@ -102,7 +103,7 @@ func (db *DBStorage) GetOrders(ctx context.Context, userID int64) []entity.Order
 
 	rows, err := db.dbConnection.QueryContext(ctx, "SELECT * FROM Orders WHERE user_id=$1 ORDER BY uploaded_at", userID)
 	if err != nil {
-		log.Printf("Couldn't read orders for user. %s\n", err)
+		log.Error().Msgf("Couldn't read orders for user. %s\n", err)
 		return nil
 	}
 
@@ -110,7 +111,7 @@ func (db *DBStorage) GetOrders(ctx context.Context, userID int64) []entity.Order
 		order := entity.Order{}
 		err = rows.Scan(&order.ID, &order.UserID, &status, &accrual, &order.UploadedAt)
 		if err != nil {
-			log.Printf("Couldn't set order %s from DB: %s\n", order.ID, err)
+			log.Error().Msgf("Couldn't set order %s from DB: %s\n", order.ID, err)
 			return nil
 		}
 		if status.Valid {
@@ -133,7 +134,7 @@ func (db *DBStorage) AddBalance(ctx context.Context, userID int64) error {
 	if err != nil {
 		return err
 	}
-	log.Printf("Add balance for user %d\n", userID)
+	log.Info().Msgf("Add balance for user %d\n", userID)
 	return nil
 }
 
@@ -143,7 +144,7 @@ func (db *DBStorage) UpdateBalance(ctx context.Context, userID int64, accrual fl
 	if err != nil {
 		return err
 	}
-	log.Printf("Update balance for user %d. Add to current = %f\n", userID, accrual)
+	log.Info().Msgf("Update balance for user %d. Add to current = %f\n", userID, accrual)
 	return nil
 }
 
@@ -153,7 +154,7 @@ func (db *DBStorage) Withdraw(ctx context.Context, userID int64, withdrawn float
 	if err != nil {
 		return err
 	}
-	log.Printf("Update balance for user %d. Add to current = %f\n", userID, sum)
+	log.Info().Msgf("Update balance for user %d. Add to current = %f\n", userID, sum)
 	return nil
 }
 
@@ -162,10 +163,10 @@ func (db *DBStorage) GetBalance(ctx context.Context, userID int64) *entity.Balan
 	err := db.dbConnection.QueryRowContext(ctx, "SELECT * FROM Balances WHERE user_id=$1", userID).
 		Scan(&balance.UserID, &balance.Current, &balance.Withdrawn)
 	if err != nil {
-		log.Printf("There is no balance data for user %d: %v\n", userID, err)
+		log.Warn().Msgf("There is no balance data for user %d: %v\n", userID, err)
 		return nil
 	}
-	fmt.Printf("Get balance for user %d: %v\n", userID, balance)
+	log.Info().Msgf("Get balance for user %d: %v\n", userID, balance)
 	return &balance
 }
 
@@ -175,7 +176,7 @@ func (db *DBStorage) AddWithdrawal(ctx context.Context, userID int64, sum float3
 	if err != nil {
 		return err
 	}
-	log.Printf("Add withdrawal for user %d\n", userID)
+	log.Info().Msgf("Add withdrawal for user %d\n", userID)
 	return nil
 }
 
@@ -184,7 +185,7 @@ func (db *DBStorage) GetWithdrawals(ctx context.Context, userID int64) []entity.
 
 	rows, err := db.dbConnection.QueryContext(ctx, "SELECT * FROM Withdrawals WHERE user_id=$1 ORDER BY processed_at", userID)
 	if err != nil {
-		log.Printf("Couldn't read withdrawals for user. %s\n", err)
+		log.Error().Msgf("Couldn't read withdrawals for user. %s\n", err)
 		return nil
 	}
 
@@ -192,13 +193,13 @@ func (db *DBStorage) GetWithdrawals(ctx context.Context, userID int64) []entity.
 		withdrawal := entity.Withdrawals{}
 		err = rows.Scan(&withdrawal.UserID, &withdrawal.Sum, &withdrawal.ProcessedAt, &withdrawal.OrderID)
 		if err != nil {
-			log.Printf("Couldn't set withdrawal from DB: %v\n", err)
+			log.Error().Msgf("Couldn't set withdrawal from DB: %v\n", err)
 			return nil
 		}
 		withdrawals = append(withdrawals, withdrawal)
 	}
 	if rows.Err() != nil {
-		log.Printf("There is error while reading rows: %v\n", rows.Err())
+		log.Error().Msgf("There is error while reading rows: %v\n", rows.Err())
 		return nil
 	}
 	return withdrawals
