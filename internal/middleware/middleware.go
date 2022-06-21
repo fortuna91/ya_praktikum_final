@@ -25,7 +25,7 @@ func Authorization(next http.Handler) http.Handler {
 			http.Error(w, errParse.Error(), http.StatusUnauthorized)
 			return
 		}
-		if user := handlers.dbStorage.GetUser(context.Background(), login); user == nil {
+		if user := handlers.GetDB().GetUser(context.Background(), login); user == nil {
 			http.Error(w, "unknown user", http.StatusUnauthorized)
 			return
 		}
