@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/theplant/luhn"
 	"net/http"
@@ -70,7 +71,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	newUser := dbStorage.GetUser(ctx, userRequest.Login)
-	if err := dbStorage.AddBalance(ctx, newUser.ID); err != nil {
+	if err := dbStorage.AddBalance(ctx, newUser.ID); errors.As(err, db.ErrorDB{}) {
 		log.Error().Msgf("Couldn't add balance: %v", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
@@ -158,12 +159,15 @@ func UploadOrder(w http.ResponseWriter, r *http.Request) {
 func GetOrders(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), ContextCancelTimeout)
 	defer cancel()
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 
 	token, _ := auth.GetTokenFromHeader(r)
 	login, _ := auth.ParseToken(token)
 	user := dbStorage.GetUser(ctx, login)
-	ordersDB := dbStorage.GetOrders(ctx, user.ID)
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	ordersDB, err := dbStorage.GetOrders(ctx, user.ID)
+	if errors.As(err, db.ErrorDB{}) {
+
+	}
 	if ordersDB == nil {
 		log.Warn().Msg("No orders for user")
 		w.WriteHeader(http.StatusNoContent)
@@ -257,7 +261,7 @@ func Withdraw(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	if err := dbStorage.Withdraw(ctx, user.ID, withdrawalRequest.Sum); err != nil {
+	if err := dbStorage.Withdraw(ctx, user.ID, withdrawalRequest.Sum); errors.As(err, db.ErrorDB{}) {
 		log.Error().Msgf("Couldn't update balance %v\n", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
@@ -273,8 +277,12 @@ func GetWithdrawals(w http.ResponseWriter, r *http.Request) {
 	token, _ := auth.GetTokenFromHeader(r)
 	login, _ := auth.ParseToken(token)
 	user := dbStorage.GetUser(ctx, login)
-	withdrawalsDB := dbStorage.GetWithdrawals(ctx, user.ID)
-	if withdrawalsDB == nil {
+	withdrawalsDB, err := dbStorage.GetWithdrawals(ctx, user.ID)
+	if errors.As(err, db.ErrorDB{}) {
+		log.Error().Msg(err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	} else {
 		log.Warn().Msg("No withdrawals for user")
 		w.WriteHeader(http.StatusNoContent)
 		return
