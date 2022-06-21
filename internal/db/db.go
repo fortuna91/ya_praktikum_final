@@ -144,7 +144,6 @@ func (db *DBStorage) UpdateBalance(ctx context.Context, userID int64, accrual fl
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Update balance for user %d. Add to current = %f\n", userID, accrual)
 	log.Info().Msgf("Update balance for user %d. Add to current = %f\n", userID, accrual)
 	return nil
 }

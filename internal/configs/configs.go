@@ -4,7 +4,6 @@ import (
 	"flag"
 	"github.com/caarlos0/env/v6"
 	"log"
-	"os"
 	"time"
 )
 
@@ -27,15 +26,15 @@ func SetServerConfig() ServerConfig {
 	}
 
 	var config ServerConfig
-	/*flag.StringVar(&config.Address, "a", envConfig.Address, "Address")
+	flag.StringVar(&config.Address, "a", envConfig.Address, "Address")
 	flag.StringVar(&config.DB, "d", envConfig.DB, "Address")
 	flag.StringVar(&config.AccrualSystem, "r", envConfig.AccrualSystem, "Address")
 
 	flag.DurationVar(&config.ContextCancel, "c", envConfig.ContextCancel, "Context cancel interval")
 	flag.DurationVar(&config.TokenDuration, "t", envConfig.TokenDuration, "Token duration")
-	flag.IntVar(&config.AccrualChannelPool, "p", envConfig.AccrualChannelPool, "Accrual channel pool size")*/
+	flag.IntVar(&config.AccrualChannelPool, "p", envConfig.AccrualChannelPool, "Accrual channel pool size")
 
-	err = env.Parse(&config)
+	/*err = env.Parse(&config)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -52,7 +51,7 @@ func SetServerConfig() ServerConfig {
 	}
 	if _, ok := os.LookupEnv("ACCRUAL_SYSTEM_ADDRESS"); !ok {
 		config.AccrualSystem = *accrualSystem
-	}
+	}*/
 
 	return config
 }
