@@ -139,7 +139,7 @@ func (db *DBStorage) AddBalance(ctx context.Context, userID int64) error {
 }
 
 func (db *DBStorage) UpdateBalance(ctx context.Context, userID int64, accrual float32) error {
-	_, err := db.dbConnection.ExecContext(ctx, "UPDATE Balances SET current = current + $1 WHERE use_id = $2",
+	_, err := db.dbConnection.ExecContext(ctx, "UPDATE Balances SET current = current + $1 WHERE user_id=$2",
 		accrual, userID)
 	if err != nil {
 		return err
@@ -150,7 +150,7 @@ func (db *DBStorage) UpdateBalance(ctx context.Context, userID int64, accrual fl
 }
 
 func (db *DBStorage) Withdraw(ctx context.Context, userID int64, withdrawn float32, sum float32) error {
-	_, err := db.dbConnection.ExecContext(ctx, "UPDATE Balances SET current = current - $1, withdrawn = withdrawn + $2 WHERE use_id = $3",
+	_, err := db.dbConnection.ExecContext(ctx, "UPDATE Balances SET current = current - $1, withdrawn = withdrawn + $2 WHERE user_id=$3",
 		sum, withdrawn, userID)
 	if err != nil {
 		return err
