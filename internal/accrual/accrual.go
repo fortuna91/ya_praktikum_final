@@ -80,12 +80,14 @@ func updateOrder(db *db.DBStorage, accrualSystemAddress string, orderID string, 
 	status := order.Status
 	/*if order.Status == REGISTERED {
 		status = PROCESSING
-	}*/ // no status REGISTERED in technical task
-	if err := db.UpdateOrder(ctx, orderID, userID, status, order.Accrual); errors.As(err, &dbmodule.ErrorDB{}) {
+	}*/// no status REGISTERED in technical task
+	var errDBOrder *dbmodule.ErrorDB
+	if err := db.UpdateOrder(ctx, orderID, userID, status, order.Accrual); errors.As(err, &errDBOrder) {
 		log.Err(err)
 		return nil, 0
 	}
-	if err := db.UpdateBalance(ctx, userID, order.Accrual); errors.As(err, &dbmodule.ErrorDB{}) {
+	var errDBBalance *dbmodule.ErrorDB
+	if err := db.UpdateBalance(ctx, userID, order.Accrual); errors.As(err, &errDBBalance) {
 		log.Err(err)
 		return nil, 0
 	}

@@ -71,7 +71,8 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	newUser := dbStorage.GetUser(ctx, userRequest.Login)
-	if err := dbStorage.AddBalance(ctx, newUser.ID); errors.As(err, &db.ErrorDB{}) {
+	var errDB *db.ErrorDB
+	if err := dbStorage.AddBalance(ctx, newUser.ID); errors.As(err, &errDB) {
 		log.Error().Msgf("Couldn't add balance: %v", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
@@ -165,7 +166,8 @@ func GetOrders(w http.ResponseWriter, r *http.Request) {
 	login, _ := auth.ParseToken(token)
 	user := dbStorage.GetUser(ctx, login)
 	ordersDB, err := dbStorage.GetOrders(ctx, user.ID)
-	if errors.As(err, &db.ErrorDB{}) {
+	var errDB *db.ErrorDB
+	if errors.As(err, &errDB) {
 
 	}
 	if ordersDB == nil {
@@ -261,7 +263,8 @@ func Withdraw(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	if err := dbStorage.Withdraw(ctx, user.ID, withdrawalRequest.Sum); errors.As(err, &db.ErrorDB{}) {
+	var errDB *db.ErrorDB
+	if err := dbStorage.Withdraw(ctx, user.ID, withdrawalRequest.Sum); errors.As(err, &errDB) {
 		log.Error().Msgf("Couldn't update balance %v\n", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
@@ -278,7 +281,8 @@ func GetWithdrawals(w http.ResponseWriter, r *http.Request) {
 	login, _ := auth.ParseToken(token)
 	user := dbStorage.GetUser(ctx, login)
 	withdrawalsDB, err := dbStorage.GetWithdrawals(ctx, user.ID)
-	if errors.As(err, &db.ErrorDB{}) {
+	var errDB *db.ErrorDB
+	if errors.As(err, &errDB) {
 		log.Error().Msg(err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
 		return
