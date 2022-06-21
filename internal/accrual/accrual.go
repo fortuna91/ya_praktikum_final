@@ -13,7 +13,7 @@ import (
 
 	"github.com/fortuna91/ya_praktikum_final/internal/body"
 	"github.com/fortuna91/ya_praktikum_final/internal/db"
-	db_module "github.com/fortuna91/ya_praktikum_final/internal/db"
+	dbmodule "github.com/fortuna91/ya_praktikum_final/internal/db"
 	"github.com/fortuna91/ya_praktikum_final/internal/entity"
 )
 
@@ -80,12 +80,12 @@ func updateOrder(db *db.DBStorage, accrualSystemAddress string, orderID string, 
 	status := order.Status
 	/*if order.Status == REGISTERED {
 		status = PROCESSING
-	}*/// no status REGISTERED in technical task
-	if err := db.UpdateOrder(ctx, orderID, userID, status, order.Accrual); errors.As(err, db_module.ErrorDB{}) {
+	}*/ // no status REGISTERED in technical task
+	if err := db.UpdateOrder(ctx, orderID, userID, status, order.Accrual); errors.As(err, &dbmodule.ErrorDB{}) {
 		log.Err(err)
 		return nil, 0
 	}
-	if err := db.UpdateBalance(ctx, userID, order.Accrual); errors.As(err, db_module.ErrorDB{}) {
+	if err := db.UpdateBalance(ctx, userID, order.Accrual); errors.As(err, &dbmodule.ErrorDB{}) {
 		log.Err(err)
 		return nil, 0
 	}
