@@ -257,7 +257,7 @@ func Withdraw(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	if err := dbStorage.Withdraw(ctx, user.ID, currBalance.Withdrawn, withdrawalRequest.Sum); err != nil {
+	if err := dbStorage.Withdraw(ctx, user.ID, withdrawalRequest.Sum); err != nil {
 		log.Error().Msgf("Couldn't update balance %v\n", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return

@@ -149,14 +149,13 @@ func (db *DBStorage) UpdateBalance(ctx context.Context, userID int64, accrual fl
 	return nil
 }
 
-func (db *DBStorage) Withdraw(ctx context.Context, userID int64, withdrawn float32, sum float32) error {
-	_, err := db.dbConnection.ExecContext(ctx, "UPDATE Balances SET current = current - $1, withdrawn = withdrawn + $2 WHERE user_id=$3",
-		sum, withdrawn, userID)
+func (db *DBStorage) Withdraw(ctx context.Context, userID int64, sum float32) error {
+	_, err := db.dbConnection.ExecContext(ctx, "UPDATE Balances SET current = current - $1, withdrawn = withdrawn + $1 WHERE user_id=$2",
+		sum, userID)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Update balance for user %d. withdrawn = %f, sum = %f\n", userID, withdrawn, sum)
-	log.Info().Msgf("Update balance for user %d. withdrawn = %f, sum = %f\n", userID, withdrawn, sum)
+	log.Info().Msgf("Update balance for user %d. Sum = %f\n", userID, sum)
 	return nil
 }
 
