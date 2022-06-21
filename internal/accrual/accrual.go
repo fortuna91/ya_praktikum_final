@@ -76,7 +76,7 @@ func updateOrder(db *db.DBStorage, accrualSystemAddress string, orderID string, 
 	status := order.Status
 	/*if order.Status == REGISTERED {
 		status = PROCESSING
-	}*/// no status REGISTERED in technical task
+	}*/ // no status REGISTERED in technical task
 	if err := db.UpdateOrder(ctx, orderID, userID, status, order.Accrual); err != nil {
 		fmt.Println(err.Error())
 		return nil, 0
@@ -90,8 +90,7 @@ func updateOrder(db *db.DBStorage, accrualSystemAddress string, orderID string, 
 
 func UpdateOrders(db *db.DBStorage) {
 	for {
-		var order entity.Order
-		order = <-QueueCh
+		order := <-QueueCh
 		accrualOrder, retryAfterNew := updateOrder(db, AccrualSystemAddress, order.ID, order.UserID)
 		if retryAfterNew > 0 {
 			retryAfter = retryAfterNew
