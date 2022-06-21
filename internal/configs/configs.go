@@ -33,6 +33,7 @@ func SetServerConfig() ServerConfig {
 	flag.DurationVar(&config.ContextCancel, "c", envConfig.ContextCancel, "Context cancel interval")
 	flag.DurationVar(&config.TokenDuration, "t", envConfig.TokenDuration, "Token duration")
 	flag.IntVar(&config.AccrualChannelPool, "p", envConfig.AccrualChannelPool, "Accrual channel pool size")
+	flag.StringVar(&config.HashKey, "k", envConfig.HashKey, "Hash key for passwords")
 
 	/*err = env.Parse(&config)
 	if err != nil {
