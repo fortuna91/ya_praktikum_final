@@ -39,14 +39,14 @@ func main() {
 		log.Println("Server was stopped correctly")
 	}()
 
-	if err := handlers.PrepareDB(config.DB); err != nil {
-		panic(err)
-	}
-
 	handlers.ContextCancelTimeout = config.ContextCancel
 	accrual.ContextCancelTimeout = config.ContextCancel
 	accrual.AccrualSystemAddress = config.AccrualSystem
 	auth.TokenDuration = config.TokenDuration
+
+	if err := handlers.PrepareDB(config.DB); err != nil {
+		panic(err)
+	}
 
 	// run accrual system
 	go func() {
