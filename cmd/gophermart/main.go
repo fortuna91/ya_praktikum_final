@@ -2,8 +2,9 @@ package main
 
 import (
 	"context"
+	"github.com/fortuna91/ya_praktikum_final/internal/accrual"
+	"github.com/fortuna91/ya_praktikum_final/internal/auth"
 	"github.com/fortuna91/ya_praktikum_final/internal/configs"
-	"github.com/fortuna91/ya_praktikum_final/internal/db"
 	"github.com/fortuna91/ya_praktikum_final/internal/handlers"
 	"github.com/fortuna91/ya_praktikum_final/internal/middleware"
 	"github.com/fortuna91/ya_praktikum_final/internal/server"
@@ -38,15 +39,18 @@ func main() {
 		log.Println("Server was stopped correctly")
 	}()
 
-	handlers.DB = db.New(config.DB)
-	handlers.DB.Create(context.Background())
+	if err := handlers.PrepareDB(config.DB); err != nil {
+		panic(err)
+	}
 
-	handlers.Queue.AccrualSystemAddress = config.AccrualSystem
-	handlers.Queue.RetryAfter = 0
+	handlers.ContextCancelTimeout = config.ContextCancel
+	accrual.ContextCancelTimeout = config.ContextCancel
+	accrual.AccrualSystemAddress = config.AccrualSystem
+	auth.TokenDuration = config.TokenDuration
 
 	// run accrual system
 	go func() {
-		handlers.Queue.UpdateOrders(handlers.DB)
+		accrual.UpdateOrders(handlers.GetDB())
 	}()
 
 	log.Printf("Start server on %s", config.Address)

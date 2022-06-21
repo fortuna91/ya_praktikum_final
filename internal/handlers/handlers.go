@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"github.com/fortuna91/ya_praktikum_final/internal/accrual"
 	"github.com/fortuna91/ya_praktikum_final/internal/auth"
+	"github.com/fortuna91/ya_praktikum_final/internal/body"
 	"github.com/fortuna91/ya_praktikum_final/internal/db"
-	"github.com/fortuna91/ya_praktikum_final/internal/utils"
+	"github.com/fortuna91/ya_praktikum_final/internal/entity"
 	"github.com/theplant/luhn"
 	"log"
 	"net/http"
@@ -15,36 +16,57 @@ import (
 	"time"
 )
 
-var DB *db.DBStorage
-var Queue = accrual.QueueAccrualSystem{}
+var dbStorage *db.DBStorage
+var ContextCancelTimeout time.Duration
 
 const NewStatus = "NEW"
 
+func PrepareDB(dbAddress string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), ContextCancelTimeout)
+	defer cancel()
+	if dbStorage != nil {
+		return fmt.Errorf("db has already been initialized")
+	}
+
+	var err error
+	dbStorage, err = db.New(dbAddress)
+	if err != nil {
+		return err
+	}
+	// error
+	dbStorage.Create(ctx)
+	return nil
+}
+
+func GetDB() *db.DBStorage {
+	return dbStorage
+}
+
 func Register(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), ContextCancelTimeout)
 	defer cancel()
 	r.Header.Add("Content-Type", "application/json; charset=utf-8")
-	respBody := utils.GetBody(r.Body)
+	respBody := body.GetBody(r.Body)
 	if respBody == nil {
 		http.Error(w, "Couldn't read body", http.StatusInternalServerError)
 		return
 	}
-	userRequest := db.UserData{}
+	userRequest := entity.User{}
 	if errJSON := json.Unmarshal(*respBody, &userRequest); errJSON != nil {
 		http.Error(w, "Wrong request", http.StatusBadRequest)
 		return
 	}
-	userDB := DB.GetUser(ctx, userRequest.Login)
+	userDB := dbStorage.GetUser(ctx, userRequest.Login)
 	if userDB != nil {
 		http.Error(w, "Login exists", http.StatusConflict)
 		return
 	}
-	if errAdd := DB.AddUser(ctx, userRequest.Login, auth.CalcHash("someKey", userRequest.Password)); errAdd != nil {
+	if errAdd := dbStorage.AddUser(ctx, userRequest.Login, auth.CalcHash("someKey", userRequest.Password)); errAdd != nil {
 		http.Error(w, errAdd.Error(), http.StatusInternalServerError)
 		return
 	}
-	newUser := DB.GetUser(ctx, userRequest.Login)
-	if err := DB.UpdateBalance(ctx, newUser.ID, 0, 0); err != nil {
+	newUser := dbStorage.GetUser(ctx, userRequest.Login)
+	if err := dbStorage.AddBalance(ctx, newUser.ID); err != nil {
 		log.Printf("Couldn't add balance: %v\n", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
@@ -60,21 +82,21 @@ func Register(w http.ResponseWriter, r *http.Request) {
 }
 
 func Login(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), ContextCancelTimeout)
 	defer cancel()
 	r.Header.Add("Content-Type", "application/json; charset=utf-8")
 
-	respBody := utils.GetBody(r.Body)
+	respBody := body.GetBody(r.Body)
 	if respBody == nil {
 		http.Error(w, "Couldn't read body", http.StatusInternalServerError)
 		return
 	}
-	userRequest := db.UserData{}
+	userRequest := entity.User{}
 	if errJSON := json.Unmarshal(*respBody, &userRequest); errJSON != nil {
 		http.Error(w, "Wrong request", http.StatusBadRequest)
 		return
 	}
-	userDB := DB.GetUser(ctx, userRequest.Login)
+	userDB := dbStorage.GetUser(ctx, userRequest.Login)
 	if userDB == nil {
 		http.Error(w, "Login doesn't exist", http.StatusUnauthorized)
 		return
@@ -95,14 +117,14 @@ func Login(w http.ResponseWriter, r *http.Request) {
 }
 
 func UploadOrder(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), ContextCancelTimeout)
 	defer cancel()
 	r.Header.Add("Content-Type", "application/json; charset=utf-8")
 
 	token, _ := auth.GetTokenFromHeader(r)
 	login, _ := auth.ParseToken(token)
-	user := DB.GetUser(ctx, login)
-	orderID := string(*utils.GetBody(r.Body))
+	user := dbStorage.GetUser(ctx, login)
+	orderID := string(*body.GetBody(r.Body))
 	intOrderID, err := strconv.ParseInt(orderID, 10, 64)
 	if err != nil {
 		http.Error(w, "wrong order format", http.StatusUnprocessableEntity)
@@ -112,7 +134,7 @@ func UploadOrder(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "wrong order format, luhn", http.StatusUnprocessableEntity)
 		return
 	}
-	orderDB := DB.GetOrder(ctx, orderID)
+	orderDB := dbStorage.GetOrder(ctx, orderID)
 	if orderDB != nil {
 		if orderDB.UserID != user.ID {
 			http.Error(w, "order belongs to another user", http.StatusConflict)
@@ -122,22 +144,22 @@ func UploadOrder(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	if errAdd := DB.AddOrder(ctx, orderID, user.ID, NewStatus); errAdd != nil {
+	if errAdd := dbStorage.AddOrder(ctx, orderID, user.ID, NewStatus); errAdd != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	Queue.Append(*DB.GetOrder(ctx, orderID))
+	accrual.QueueCh <- *dbStorage.GetOrder(ctx, orderID)
 	w.WriteHeader(http.StatusAccepted)
 }
+
 func GetOrders(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), ContextCancelTimeout)
 	defer cancel()
-	// r.Header.Add("Content-Type", "application/json; charset=utf-8")
 
 	token, _ := auth.GetTokenFromHeader(r)
 	login, _ := auth.ParseToken(token)
-	user := DB.GetUser(ctx, login)
-	ordersDB := DB.GetOrders(ctx, user.ID)
+	user := dbStorage.GetUser(ctx, login)
+	ordersDB := dbStorage.GetOrders(ctx, user.ID)
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	if ordersDB == nil {
 		log.Println("No orders for user")
@@ -160,13 +182,13 @@ func GetOrders(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetBalance(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), ContextCancelTimeout)
 	defer cancel()
 
 	token, _ := auth.GetTokenFromHeader(r)
 	login, _ := auth.ParseToken(token)
-	user := DB.GetUser(ctx, login)
-	balanceDB := DB.GetBalance(ctx, user.ID)
+	user := dbStorage.GetUser(ctx, login)
+	balanceDB := dbStorage.GetBalance(ctx, user.ID)
 	if balanceDB == nil {
 		log.Println("No balance for user")
 		w.WriteHeader(http.StatusInternalServerError)
@@ -187,26 +209,27 @@ func GetBalance(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 }
+
 func Withdraw(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), ContextCancelTimeout)
 	defer cancel()
 	r.Header.Add("Content-Type", "application/json; charset=utf-8")
 
 	token, _ := auth.GetTokenFromHeader(r)
 	login, _ := auth.ParseToken(token)
-	user := DB.GetUser(ctx, login)
+	user := dbStorage.GetUser(ctx, login)
 
-	respBody := utils.GetBody(r.Body)
+	respBody := body.GetBody(r.Body)
 	if respBody == nil {
 		http.Error(w, "Couldn't read body", http.StatusInternalServerError)
 		return
 	}
-	withdrawalRequest := db.WithdrawalsData{}
+	withdrawalRequest := entity.Withdrawals{}
 	if errJSON := json.Unmarshal(*respBody, &withdrawalRequest); errJSON != nil {
 		http.Error(w, errJSON.Error(), http.StatusBadRequest) //"wrong request",
 		return
 	}
-	currBalance := DB.GetBalance(ctx, user.ID)
+	currBalance := dbStorage.GetBalance(ctx, user.ID)
 	if currBalance == nil {
 		log.Println("Couldn't find balance")
 		http.Error(w, "internal error", http.StatusInternalServerError)
@@ -226,29 +249,28 @@ func Withdraw(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "wrong order format", http.StatusUnprocessableEntity)
 		return
 	}
-	if err := DB.AddWithdrawal(ctx, user.ID, withdrawalRequest.Sum, withdrawalRequest.OrderID); err != nil {
+	if err := dbStorage.AddWithdrawal(ctx, user.ID, withdrawalRequest.Sum, withdrawalRequest.OrderID); err != nil {
 		log.Printf("Couldn't add withdrawal %v\n", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	newBalance := currBalance.Current - withdrawalRequest.Sum
-	newWithdrawn := currBalance.Withdrawn + withdrawalRequest.Sum
-	if err := DB.UpdateBalance(ctx, user.ID, newBalance, newWithdrawn); err != nil {
+	if err := dbStorage.Withdraw(ctx, user.ID, currBalance.Withdrawn, withdrawalRequest.Sum); err != nil {
 		log.Printf("Couldn't update balance %v\n", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(http.StatusOK)
 }
+
 func GetWithdrawals(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), ContextCancelTimeout)
 	defer cancel()
 	r.Header.Add("Content-Type", "application/json; charset=utf-8")
 
 	token, _ := auth.GetTokenFromHeader(r)
 	login, _ := auth.ParseToken(token)
-	user := DB.GetUser(ctx, login)
-	withdrawalsDB := DB.GetWithdrawals(ctx, user.ID)
+	user := dbStorage.GetUser(ctx, login)
+	withdrawalsDB := dbStorage.GetWithdrawals(ctx, user.ID)
 	if withdrawalsDB == nil {
 		log.Println("No withdrawals for user")
 		w.WriteHeader(http.StatusNoContent)

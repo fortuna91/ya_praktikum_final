@@ -6,19 +6,19 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/dgrijalva/jwt-go/v4"
-	"github.com/fortuna91/ya_praktikum_final/internal/db"
+	"github.com/fortuna91/ya_praktikum_final/internal/entity"
 	"net/http"
 	"strings"
 	"time"
 )
 
-var tokenDuration = 1 * time.Hour
+var TokenDuration time.Duration
 var mySigningKey = []byte("secret")
 
-func SetToken(userRequest *db.UserData) (string, error) {
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, &db.UserData{
+func SetToken(userRequest *entity.User) (string, error) {
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, &entity.User{
 		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: jwt.At(time.Now().Add(tokenDuration)),
+			ExpiresAt: jwt.At(time.Now().Add(TokenDuration)),
 			IssuedAt:  jwt.At(time.Now()),
 		},
 		Login: userRequest.Login,
@@ -27,7 +27,7 @@ func SetToken(userRequest *db.UserData) (string, error) {
 }
 
 func ParseToken(tokenRequest string) (string, error) {
-	token, err := jwt.ParseWithClaims(tokenRequest, &db.UserData{}, func(token *jwt.Token) (interface{}, error) {
+	token, err := jwt.ParseWithClaims(tokenRequest, &entity.User{}, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected singing method")
 		}
@@ -36,7 +36,7 @@ func ParseToken(tokenRequest string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if claims, ok := token.Claims.(*db.UserData); ok && token.Valid {
+	if claims, ok := token.Claims.(*entity.User); ok && token.Valid {
 		return claims.Login, nil
 	}
 	return "", fmt.Errorf("invalid access token")

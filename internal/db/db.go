@@ -4,55 +4,23 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/dgrijalva/jwt-go/v4"
-	"log"
-	"time"
-
+	"github.com/fortuna91/ya_praktikum_final/internal/entity"
 	_ "github.com/jackc/pgx/v4/stdlib"
+	"log"
 )
-
-type UserData struct {
-	jwt.StandardClaims
-	ID       int64  `json:"-"`
-	Login    string `json:"login"`
-	Password string `json:"password"`
-}
-
-type OrderData struct {
-	ID         string    `json:"number,omitempty"`
-	UserID     int64     `json:"-"`
-	Status     string    `json:"status"`
-	Accrual    float32   `json:"accrual,omitempty"`
-	UploadedAt time.Time `json:"uploaded_at"`
-	// for accrual system
-	// OrderID string `json:"order,omitempty"`
-}
-
-type BalanceData struct {
-	UserID    int64   `json:"-"`
-	Current   float32 `json:"current"`
-	Withdrawn float32 `json:"withdrawn"`
-}
-
-type WithdrawalsData struct {
-	UserID      int64     `json:"-"`
-	Sum         float32   `json:"sum"`
-	ProcessedAt time.Time `json:"processed_at"`
-	OrderID     string    `json:"order"`
-}
 
 type DBStorage struct {
 	dbConnection *sql.DB
 }
 
-func New(dbAddress string) *DBStorage {
+func New(dbAddress string) (*DBStorage, error) {
 	dbConn, err := sql.Open("pgx", dbAddress)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	return &DBStorage{
 		dbConnection: dbConn,
-	}
+	}, nil
 }
 
 func (db *DBStorage) Create(ctx context.Context) {
@@ -66,8 +34,8 @@ func (db *DBStorage) Close() {
 	db.dbConnection.Close()
 }
 
-func (db *DBStorage) GetUser(ctx context.Context, login string) *UserData {
-	user := UserData{}
+func (db *DBStorage) GetUser(ctx context.Context, login string) *entity.User {
+	user := entity.User{}
 
 	err := db.dbConnection.QueryRowContext(ctx, "SELECT * FROM Users WHERE login=$1", login).Scan(&user.ID, &user.Login, &user.Password)
 	if err != nil {
@@ -86,8 +54,8 @@ func (db *DBStorage) AddUser(ctx context.Context, login string, password string)
 	return nil
 }
 
-func (db *DBStorage) GetOrder(ctx context.Context, orderID string) *OrderData {
-	order := OrderData{}
+func (db *DBStorage) GetOrder(ctx context.Context, orderID string) *entity.Order {
+	order := entity.Order{}
 	var status sql.NullString
 	var accrual sql.NullFloat64
 
@@ -127,8 +95,8 @@ func (db *DBStorage) UpdateOrder(ctx context.Context, id string, userID int64, s
 	return nil
 }
 
-func (db *DBStorage) GetOrders(ctx context.Context, userID int64) []OrderData {
-	var orders []OrderData
+func (db *DBStorage) GetOrders(ctx context.Context, userID int64) []entity.Order {
+	var orders []entity.Order
 	var status sql.NullString
 	var accrual sql.NullFloat64
 
@@ -139,7 +107,7 @@ func (db *DBStorage) GetOrders(ctx context.Context, userID int64) []OrderData {
 	}
 
 	for rows.Next() {
-		order := OrderData{}
+		order := entity.Order{}
 		err = rows.Scan(&order.ID, &order.UserID, &status, &accrual, &order.UploadedAt)
 		if err != nil {
 			log.Printf("Couldn't set order %s from DB: %s\n", order.ID, err)
@@ -160,18 +128,37 @@ func (db *DBStorage) GetOrders(ctx context.Context, userID int64) []OrderData {
 	return orders
 }
 
-func (db *DBStorage) UpdateBalance(ctx context.Context, userID int64, current float32, withdrawn float32) error {
-	_, err := db.dbConnection.ExecContext(ctx, "INSERT INTO Balances (user_id, current, withdrawn) VALUES ($1, $2, $3) ON CONFLICT (user_id) DO UPDATE SET current = excluded.current, withdrawn = excluded.withdrawn",
-		userID, current, withdrawn)
+func (db *DBStorage) AddBalance(ctx context.Context, userID int64) error {
+	_, err := db.dbConnection.ExecContext(ctx, "INSERT INTO Balances (user_id) VALUES ($1);", userID)
 	if err != nil {
 		return err
 	}
-	log.Printf("Update balance for user %d. Current = %f\n", userID, current)
+	log.Printf("Add balance for user %d\n", userID)
 	return nil
 }
 
-func (db *DBStorage) GetBalance(ctx context.Context, userID int64) *BalanceData {
-	balance := BalanceData{}
+func (db *DBStorage) UpdateBalance(ctx context.Context, userID int64, accrual float32) error {
+	_, err := db.dbConnection.ExecContext(ctx, "UPDATE Balances SET current = current + $1 WHERE use_id = $3",
+		accrual, userID)
+	if err != nil {
+		return err
+	}
+	log.Printf("Update balance for user %d. Add to current = %f\n", userID, accrual)
+	return nil
+}
+
+func (db *DBStorage) Withdraw(ctx context.Context, userID int64, withdrawn float32, sum float32) error {
+	_, err := db.dbConnection.ExecContext(ctx, "UPDATE Balances SET current = current - $1, withdrawn = withdrawn + $2 WHERE use_id = $3",
+		sum, withdrawn, userID)
+	if err != nil {
+		return err
+	}
+	log.Printf("Update balance for user %d. Add to current = %f\n", userID, sum)
+	return nil
+}
+
+func (db *DBStorage) GetBalance(ctx context.Context, userID int64) *entity.Balance {
+	balance := entity.Balance{}
 	err := db.dbConnection.QueryRowContext(ctx, "SELECT * FROM Balances WHERE user_id=$1", userID).
 		Scan(&balance.UserID, &balance.Current, &balance.Withdrawn)
 	if err != nil {
@@ -192,8 +179,8 @@ func (db *DBStorage) AddWithdrawal(ctx context.Context, userID int64, sum float3
 	return nil
 }
 
-func (db *DBStorage) GetWithdrawals(ctx context.Context, userID int64) []WithdrawalsData {
-	var withdrawals []WithdrawalsData
+func (db *DBStorage) GetWithdrawals(ctx context.Context, userID int64) []entity.Withdrawals {
+	var withdrawals []entity.Withdrawals
 
 	rows, err := db.dbConnection.QueryContext(ctx, "SELECT * FROM Withdrawals WHERE user_id=$1 ORDER BY processed_at", userID)
 	if err != nil {
@@ -202,7 +189,7 @@ func (db *DBStorage) GetWithdrawals(ctx context.Context, userID int64) []Withdra
 	}
 
 	for rows.Next() {
-		withdrawal := WithdrawalsData{}
+		withdrawal := entity.Withdrawals{}
 		err = rows.Scan(&withdrawal.UserID, &withdrawal.Sum, &withdrawal.ProcessedAt, &withdrawal.OrderID)
 		if err != nil {
 			log.Printf("Couldn't set withdrawal from DB: %v\n", err)
@@ -211,6 +198,7 @@ func (db *DBStorage) GetWithdrawals(ctx context.Context, userID int64) []Withdra
 		withdrawals = append(withdrawals, withdrawal)
 	}
 	if rows.Err() != nil {
+		log.Printf("There is error while reading rows: %v\n", rows.Err())
 		return nil
 	}
 	return withdrawals
