@@ -12,7 +12,6 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/fortuna91/ya_praktikum_final/internal/body"
-	"github.com/fortuna91/ya_praktikum_final/internal/db"
 	dbmodule "github.com/fortuna91/ya_praktikum_final/internal/db"
 	"github.com/fortuna91/ya_praktikum_final/internal/entity"
 )
@@ -69,7 +68,7 @@ func getAccrual(accrualSystemAddress string, orderID string) (*entity.Order, int
 	return &orderResponse, 0
 }
 
-func updateOrder(db *db.DBStorage, accrualSystemAddress string, orderID string, userID int64) (*entity.Order, int) {
+func updateOrder(db *dbmodule.DBStorage, accrualSystemAddress string, orderID string, userID int64) (*entity.Order, int) {
 	ctx, cancel := context.WithTimeout(context.Background(), ContextCancelTimeout)
 	defer cancel()
 	order, retryAfter := getAccrual(accrualSystemAddress, orderID)
@@ -80,7 +79,7 @@ func updateOrder(db *db.DBStorage, accrualSystemAddress string, orderID string, 
 	status := order.Status
 	/*if order.Status == REGISTERED {
 		status = PROCESSING
-	}*/// no status REGISTERED in technical task
+	}*/ // no status REGISTERED in technical task
 	var errDBOrder *dbmodule.ErrorDB
 	if err := db.UpdateOrder(ctx, orderID, userID, status, order.Accrual); errors.As(err, &errDBOrder) {
 		log.Err(err)
@@ -94,7 +93,7 @@ func updateOrder(db *db.DBStorage, accrualSystemAddress string, orderID string, 
 	return order, 0
 }
 
-func UpdateOrders(db *db.DBStorage) {
+func UpdateOrders(db *dbmodule.DBStorage) {
 	for {
 		order := <-QueueCh
 		accrualOrder, retryAfterNew := updateOrder(db, AccrualSystemAddress, order.ID, order.UserID)

@@ -168,7 +168,8 @@ func GetOrders(w http.ResponseWriter, r *http.Request) {
 	ordersDB, err := dbStorage.GetOrders(ctx, user.ID)
 	var errDB *db.ErrorDB
 	if errors.As(err, &errDB) {
-
+		http.Error(w, "Error getting orders", http.StatusInternalServerError)
+		return
 	}
 	if ordersDB == nil {
 		log.Warn().Msg("No orders for user")
@@ -281,14 +282,15 @@ func GetWithdrawals(w http.ResponseWriter, r *http.Request) {
 	login, _ := auth.ParseToken(token)
 	user := dbStorage.GetUser(ctx, login)
 	withdrawalsDB, err := dbStorage.GetWithdrawals(ctx, user.ID)
-	var errDB *db.ErrorDB
-	if errors.As(err, &errDB) {
-		log.Error().Msg(err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	} else {
-		log.Warn().Msg("No withdrawals for user")
-		w.WriteHeader(http.StatusNoContent)
+	if err != nil {
+		var errDB *db.ErrorDB
+		if errors.As(err, &errDB) {
+			log.Error().Msg(err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+		} else {
+			log.Warn().Msg("No withdrawals for user")
+			w.WriteHeader(http.StatusNoContent)
+		}
 		return
 	}
 	bodyResp, err := json.Marshal(withdrawalsDB)
